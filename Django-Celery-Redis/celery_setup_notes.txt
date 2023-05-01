@@ -1,0 +1,72 @@
+Create celery.py
+
+from celery import Celery
+import os
+from django.conf import settings
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'projectname.settings')
+
+app = Celery('cprojectname')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
+
+
+Update settings.py
+import os
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER", "redis://redis:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_BROKER", "redis://redis:6379/0")
+
+
+Docker-Compose file
+
+version: "3.9"
+services:
+  django:
+    build: .
+    container_name: django
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/usr/src/app/
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+  celery:
+    build: .
+    command: celery -A celery_django_rabbitmq worker -l INFO
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+    depends_on:
+      - django
+      - redis
+  redis:
+    image: redis:alpine
+
+    
+projectname
+    __init__.py
+        from .celery import app as celery_app
+
+
+        __all__ = ("celery_app",)
+
+
+app
+    tasks.py
+        from celery import shared_task
+        import requests
+        from bs4 import BeautifulSoup
+
+        @shared_task
+        def my_async_task(x, y):
+            # code to run asynchronously
+            return x + y
